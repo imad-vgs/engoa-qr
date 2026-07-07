@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تفاصيل طفاية الحريق - ENGOA</title>
-    <!-- استدعاء مكتبة Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; text-align: center; }
@@ -34,19 +33,21 @@
             <div class="detail"><span class="label">الحالة الفنية:</span> <span id="valStatus"></span></div>
         </div>
         
-        <div id="loading" style="margin: 30px 0; color: #666;">جاري الاتصال بقاعدة البيانات...</div>
+        <div id="loading" style="margin: 30px 0; color: #666; font-weight: bold;">جاري الاتصال بقاعدة البيانات... ⏳</div>
         <p id="errorMessage" style="color: red; display: none; font-weight: bold;">❌ لم يتم العثور على هذه الطفاية في السجلات.</p>
         
         <div class="footer">ENGOA - Attendance & Safety System</div>
     </div>
 
     <script>
-        // مفاتيح الاتصال بقاعدة بياناتك
+        // مفاتيح الاتصال
         const SUPABASE_URL = 'https://fsbppktghgvwirjrfcbk.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_9c4X7tn-hiiuEj4ayyKiyw_dZUjkhL6';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // تم تصحيح اسم المتغير هنا ليصبح supabaseClient
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // سحب الرقم التسلسلي من الرابط (مثال: ?id=EXT-00001)
+        // سحب الرقم التسلسلي من الرابط 
         const urlParams = new URLSearchParams(window.location.search);
         const serialId = urlParams.get('id');
 
@@ -62,8 +63,8 @@
 
             document.getElementById('serialNumber').innerText = 'طفاية رقم: ' + serialId;
 
-            // جلب البيانات من Supabase
-            const { data, error } = await supabase
+            // استخدام المتغير المصحح
+            const { data, error } = await supabaseClient
                 .from('extinguishers')
                 .select('*')
                 .eq('serial_number', serialId)
@@ -78,12 +79,10 @@
                 document.getElementById('valWeight').innerText = (data.weight || '-') + ' كغ';
                 document.getElementById('valExpiry').innerText = data.expiry_date || '-';
 
-                // فحص الصلاحية وحساب الأيام المتبقية
                 if (data.expiry_date) {
                     const expiryDate = new Date(data.expiry_date);
                     const today = new Date();
                     
-                    // تصفير الوقت للمقارنة الدقيقة للأيام
                     today.setHours(0, 0, 0, 0);
                     expiryDate.setHours(0, 0, 0, 0);
                     
