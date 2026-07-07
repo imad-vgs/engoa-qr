@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تفاصيل طفاية الحريق - ENGOA</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; text-align: center; }
         .card { background: white; max-width: 400px; margin: 20px auto; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 6px solid #d32f2f; }
@@ -23,7 +25,7 @@
 
     <div class="card" id="infoCard">
         <h2>🧯 نظام ENGOA للسلامة</h2>
-        <h3 id="serialNumber">جاري البحث عن الطفاية...</h3>
+        <h3 id="serialNumber">جاري فحص الطفاية...</h3>
         
         <div id="detailsContent" style="display: none;">
             <div class="detail"><span class="label">المكان المخصص:</span> <span class="value" id="valProject"></span></div>
@@ -33,79 +35,90 @@
             <div class="detail"><span class="label">الحالة الفنية:</span> <span id="valStatus"></span></div>
         </div>
         
-        <div id="loading" style="margin: 30px 0; color: #666; font-weight: bold;">جاري الاتصال بقاعدة البيانات... ⏳</div>
-        <p id="errorMessage" style="color: red; display: none; font-weight: bold;">❌ لم يتم العثور على هذه الطفاية في السجلات.</p>
+        <div id="loading" style="margin: 30px 0; color: #1565c0; font-weight: bold;">جاري الاتصال بقاعدة البيانات... ⏳</div>
+        <p id="errorMessage" style="color: red; display: none; font-weight: bold; line-height: 1.5;"></p>
         
         <div class="footer">ENGOA - Attendance & Safety System</div>
     </div>
 
     <script>
-        // مفاتيح الاتصال
-        const SUPABASE_URL = 'https://fsbppktghgvwirjrfcbk.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_9c4X7tn-hiiuEj4ayyKiyw_dZUjkhL6';
-        
-        // تم تصحيح اسم المتغير هنا ليصبح supabaseClient
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // ننتظر تحميل الصفحة بالكامل لتفادي أي تعليق
+        window.onload = async function() {
+            try {
+                // 1. التأكد من أن مكتبة قاعدة البيانات لم يحظرها الإنترنت
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error("تم حظر أو تأخر تحميل مكتبة الاتصال. يرجى التأكد من جودة الإنترنت أو إيقاف مانع الإعلانات.");
+                }
 
-        // سحب الرقم التسلسلي من الرابط 
-        const urlParams = new URLSearchParams(window.location.search);
-        const serialId = urlParams.get('id');
+                const SUPABASE_URL = 'https://fsbppktghgvwirjrfcbk.supabase.co';
+                const SUPABASE_KEY = 'sb_publishable_9c4X7tn-hiiuEj4ayyKiyw_dZUjkhL6';
+                const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function fetchExtinguisherData() {
-            document.getElementById('loading').style.display = 'none';
+                // 2. سحب الرقم التسلسلي من الرابط 
+                const urlParams = new URLSearchParams(window.location.search);
+                const serialId = urlParams.get('id');
 
-            if (!serialId) {
-                document.getElementById('serialNumber').innerText = 'رابط غير صالح';
-                document.getElementById('errorMessage').innerText = 'الرجاء مسح رمز الـ QR الصحيح.';
-                document.getElementById('errorMessage').style.display = 'block';
-                return;
-            }
+                // إخفاء رسالة "جاري الاتصال" لأن السكريبت يعمل بنجاح حتى هنا
+                document.getElementById('loading').style.display = 'none';
 
-            document.getElementById('serialNumber').innerText = 'طفاية رقم: ' + serialId;
+                // 3. التأكد من أن المستخدم مسح QR Code حقيقي ولم يفتح الرابط فارغاً
+                if (!serialId) {
+                    document.getElementById('serialNumber').innerText = 'رابط غير صالح';
+                    document.getElementById('errorMessage').innerText = '❌ لم يتم تمرير رقم الطفاية. الرجاء اختبار الصفحة عبر مسح رمز QR من تطبيق الكمبيوتر وليس بفتح الرابط مباشرة.';
+                    document.getElementById('errorMessage').style.display = 'block';
+                    return;
+                }
 
-            // استخدام المتغير المصحح
-            const { data, error } = await supabaseClient
-                .from('extinguishers')
-                .select('*')
-                .eq('serial_number', serialId)
-                .single();
+                document.getElementById('serialNumber').innerText = 'طفاية رقم: ' + serialId;
 
-            if (error || !data) {
-                document.getElementById('errorMessage').style.display = 'block';
-            } else {
-                document.getElementById('detailsContent').style.display = 'block';
-                document.getElementById('valProject').innerText = data.project || '-';
-                document.getElementById('valType').innerText = data.type || '-';
-                document.getElementById('valWeight').innerText = (data.weight || '-') + ' كغ';
-                document.getElementById('valExpiry').innerText = data.expiry_date || '-';
+                // 4. جلب البيانات من Supabase
+                const { data, error } = await supabaseClient
+                    .from('extinguishers')
+                    .select('*')
+                    .eq('serial_number', serialId)
+                    .single();
 
-                if (data.expiry_date) {
-                    const expiryDate = new Date(data.expiry_date);
-                    const today = new Date();
-                    
-                    today.setHours(0, 0, 0, 0);
-                    expiryDate.setHours(0, 0, 0, 0);
-                    
-                    const diffTime = Math.abs(expiryDate - today);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                if (error || !data) {
+                    document.getElementById('errorMessage').innerText = '❌ لم يتم العثور على هذه الطفاية السجلات، أو أن نظام الحماية RLS في Supabase يمنع القراءة.';
+                    document.getElementById('errorMessage').style.display = 'block';
+                } else {
+                    document.getElementById('detailsContent').style.display = 'block';
+                    document.getElementById('valProject').innerText = data.project || '-';
+                    document.getElementById('valType').innerText = data.type || '-';
+                    document.getElementById('valWeight').innerText = (data.weight || '-') + ' كغ';
+                    document.getElementById('valExpiry').innerText = data.expiry_date || '-';
 
-                    const statusElement = document.getElementById('valStatus');
+                    if (data.expiry_date) {
+                        const expiryDate = new Date(data.expiry_date);
+                        const today = new Date();
+                        
+                        today.setHours(0, 0, 0, 0);
+                        expiryDate.setHours(0, 0, 0, 0);
+                        
+                        const diffTime = expiryDate - today;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-                    if (expiryDate < today) {
-                        statusElement.innerText = 'منتهية الصلاحية ⚠️';
-                        statusElement.className = 'expired';
-                    } else if (expiryDate >= today && diffDays <= 15) {
-                        statusElement.innerText = 'تحذير (متبقي ' + diffDays + ' أيام) ⏳';
-                        statusElement.className = 'warning';
-                    } else {
-                        statusElement.innerText = 'صالحة للاستخدام ✅';
-                        statusElement.className = 'valid';
+                        const statusElement = document.getElementById('valStatus');
+
+                        if (diffDays < 0) {
+                            statusElement.innerText = 'منتهية الصلاحية ⚠️';
+                            statusElement.className = 'expired';
+                        } else if (diffDays <= 15) {
+                            statusElement.innerText = 'تحذير (متبقي ' + diffDays + ' أيام) ⏳';
+                            statusElement.className = 'warning';
+                        } else {
+                            statusElement.innerText = 'صالحة للاستخدام ✅';
+                            statusElement.className = 'valid';
+                        }
                     }
                 }
+            } catch (e) {
+                // التقاط أي خطأ وعرضه على الشاشة فوراً
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('errorMessage').innerText = '❌ ' + e.message;
+                document.getElementById('errorMessage').style.display = 'block';
             }
-        }
-
-        fetchExtinguisherData();
+        };
     </script>
 </body>
 </html>
