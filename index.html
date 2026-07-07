@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تفاصيل طفاية الحريق - ENGOA</title>
+    <!-- استدعاء مكتبة Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; text-align: center; }
+        .card { background: white; max-width: 400px; margin: 20px auto; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 6px solid #d32f2f; }
+        h2 { color: #1565c0; margin-bottom: 5px; }
+        h3 { color: #333; margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+        .detail { display: flex; justify-content: space-between; margin: 15px 0; padding-bottom: 10px; border-bottom: 1px solid #eee; font-size: 16px; }
+        .label { font-weight: bold; color: #555; }
+        .value { color: #111; font-weight: bold;}
+        .expired { color: #d32f2f; font-weight: bold; background-color: #ffebee; padding: 5px 10px; border-radius: 5px; }
+        .warning { color: #e65100; font-weight: bold; background-color: #fff3e0; padding: 5px 10px; border-radius: 5px; }
+        .valid { color: #2e7d32; font-weight: bold; background-color: #e8f5e9; padding: 5px 10px; border-radius: 5px; }
+        .footer { margin-top: 20px; font-size: 12px; color: #888; }
+    </style>
+</head>
+<body>
+
+    <div class="card" id="infoCard">
+        <h2>🧯 نظام ENGOA للسلامة</h2>
+        <h3 id="serialNumber">جاري البحث عن الطفاية...</h3>
+        
+        <div id="detailsContent" style="display: none;">
+            <div class="detail"><span class="label">المكان المخصص:</span> <span class="value" id="valProject"></span></div>
+            <div class="detail"><span class="label">نوع الطفاية:</span> <span class="value" id="valType"></span></div>
+            <div class="detail"><span class="label">الوزن:</span> <span class="value" id="valWeight"></span></div>
+            <div class="detail"><span class="label">تاريخ الانتهاء:</span> <span class="value" id="valExpiry"></span></div>
+            <div class="detail"><span class="label">الحالة الفنية:</span> <span id="valStatus"></span></div>
+        </div>
+        
+        <div id="loading" style="margin: 30px 0; color: #666;">جاري الاتصال بقاعدة البيانات...</div>
+        <p id="errorMessage" style="color: red; display: none; font-weight: bold;">❌ لم يتم العثور على هذه الطفاية في السجلات.</p>
+        
+        <div class="footer">ENGOA - Attendance & Safety System</div>
+    </div>
+
+    <script>
+        // مفاتيح الاتصال بقاعدة بياناتك
+        const SUPABASE_URL = 'https://fsbppktghgvwirjrfcbk.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_9c4X7tn-hiiuEj4ayyKiyw_dZUjkhL6';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // سحب الرقم التسلسلي من الرابط (مثال: ?id=EXT-00001)
+        const urlParams = new URLSearchParams(window.location.search);
+        const serialId = urlParams.get('id');
+
+        async function fetchExtinguisherData() {
+            document.getElementById('loading').style.display = 'none';
+
+            if (!serialId) {
+                document.getElementById('serialNumber').innerText = 'رابط غير صالح';
+                document.getElementById('errorMessage').innerText = 'الرجاء مسح رمز الـ QR الصحيح.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('serialNumber').innerText = 'طفاية رقم: ' + serialId;
+
+            // جلب البيانات من Supabase
+            const { data, error } = await supabase
+                .from('extinguishers')
+                .select('*')
+                .eq('serial_number', serialId)
+                .single();
+
+            if (error || !data) {
+                document.getElementById('errorMessage').style.display = 'block';
+            } else {
+                document.getElementById('detailsContent').style.display = 'block';
+                document.getElementById('valProject').innerText = data.project || '-';
+                document.getElementById('valType').innerText = data.type || '-';
+                document.getElementById('valWeight').innerText = (data.weight || '-') + ' كغ';
+                document.getElementById('valExpiry').innerText = data.expiry_date || '-';
+
+                // فحص الصلاحية وحساب الأيام المتبقية
+                if (data.expiry_date) {
+                    const expiryDate = new Date(data.expiry_date);
+                    const today = new Date();
+                    
+                    // تصفير الوقت للمقارنة الدقيقة للأيام
+                    today.setHours(0, 0, 0, 0);
+                    expiryDate.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = Math.abs(expiryDate - today);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+                    const statusElement = document.getElementById('valStatus');
+
+                    if (expiryDate < today) {
+                        statusElement.innerText = 'منتهية الصلاحية ⚠️';
+                        statusElement.className = 'expired';
+                    } else if (expiryDate >= today && diffDays <= 15) {
+                        statusElement.innerText = 'تحذير (متبقي ' + diffDays + ' أيام) ⏳';
+                        statusElement.className = 'warning';
+                    } else {
+                        statusElement.innerText = 'صالحة للاستخدام ✅';
+                        statusElement.className = 'valid';
+                    }
+                }
+            }
+        }
+
+        fetchExtinguisherData();
+    </script>
+</body>
+</html>
